@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Library Management System</title>
+    <style>
+        body { font-family: Arial; background: #f5f5f5; padding: 20px; }
+        h1 { color: #333; }
+        .highlight { background-color: #e0ffe0; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f0f0f0; }
+        #final-message { font-weight: bold; color: green; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Library Management System</h1>
+
+    <div id="user-section">
+        <label for="user_name">Enter Your Name:</label>
+        <input type="text" id="user_name">
+        <button onclick="saveUser()">Submit</button>
+    </div>
+
+    <div id="action-section" style="display:none;">
+        <p>What would you like to do?</p>
+        <input type="radio" name="action" value="take" checked> Take a Book
+        <input type="radio" name="action" value="return"> Return a Book
+        <br><br>
+        <div id="book-select">
+            <label for="book_id">Select Book ID to Take:</label>
+            <input type="number" id="book_id">
+        </div>
+        <div id="return-book" style="display:none;">
+            <label for="book_title">Enter Book Title to Return:</label>
+            <input type="text" id="book_title">
+        </div>
+        <br>
+        <button onclick="submitTransaction()">Submit</button>
+    </div>
+
+    <div id="transaction-log" style="display:none;">
+        <h2>Transaction Log</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Book</th>
+                    <th>Action</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody id="log-body"></tbody>
+        </table>
+
+        <p>Do you want another transaction?</p>
+        <input type="radio" name="repeat" value="yes" checked> Yes
+        <input type="radio" name="repeat" value="no"> No
+        <button onclick="repeatOrFinish()">Continue</button>
+    </div>
+
+    <div id="final-message"></div>
+    <div id="updated-list"></div>
+
+    <script>
+        let currentUser = "";
+
+        function saveUser() {
+            currentUser = document.getElementById("user_name").value;
+            if (currentUser.trim()) {
+                document.getElementById("user-section").style.display = "none";
+                document.getElementById("action-section").style.display = "block";
+            }
+        }
+
+        document.querySelectorAll('input[name="action"]').forEach(el => {
+            el.addEventListener('change', function() {
+                if (this.value === 'take') {
+                    document.getElementById("book-select").style.display = "block";
+                    document.getElementById("return-book").style.display = "none";
+                } else {
+                    document.getElementById("book-select").style.display = "none";
+                    document.getElementById("return-book").style.display = "block";
+                }
+            });
+        });
+
+        function submitTransaction() {
+            const action = document.querySelector('input[name="action"]:checked').value;
+            const payload = {
+                user_name: currentUser,
+                action: action
+            };
+            if (action === 'take') {
+                payload.book_id = document.getElementById("book_id").value;
+            } else {
+                payload.book_title = document.getElementById("book_title").value;
+            }
+
+            fetch("/transaction", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const logs = data.transactions;
+                    const logBody = document.getElementById("log-body");
+                    logBody.innerHTML = "";
+                    logs.forEach(log => {
+                        logBody.innerHTML += `<tr><td>${log.user}</td><td>${log.book}</td><td>${log.action}</td><td>${log.date}</td><td>${log.time}</td></tr>`;
+                    });
+                    document.getElementById("transaction-log").style.display = "block";
+                    document.getElementById("action-section").style.display = "none";
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+        function repeatOrFinish() {
+            const choice = document.querySelector('input[name="repeat"]:checked').value;
+            if (choice === "yes") {
+                document.getElementById("action-section").style.display = "block";
+                document.getElementById("transaction-log").style.display = "none";
+            } else {
+                fetch("/finish", {
+                    method: "POST"
+                })
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById("transaction-log").style.display = "none";
+                    document.getElementById("final-message").innerText = data.message;
+                    let listHTML = `<p>Total Available Books: ${data.available_count}</p><ul>`;
+                    data.available_books.forEach(book => {
+                        const cls = book.id > 100 ? 'highlight' : '';
+                        listHTML += `<li class="${cls}">${book.id}. ${book.title}</li>`;
+                    });
+                    listHTML += `</ul>`;
+                    document.getElementById("updated-list").innerHTML = listHTML;
+                });
+            }
+        }
+    </script>
+</body>
+</html>
